@@ -16,6 +16,9 @@ The architecture for this project is losely based off of an MVC architecture. A 
 **Questions**  
 - Is there a way to run python code on a website?
 
+## Code Review
+Most of this project has been written. So far, the skeletal structure of the language model has been implemented as well as the main, controller, and view classes. The biggest challenge being faced right now is figuring out a way to train the model using a unique dataset. As a result, the training function and text request function have been delayed. The model class has also been delayed since it heavily relies on the output of the language model.
+
 ## Running the Code
 To run the code you will need the following packages:
 
