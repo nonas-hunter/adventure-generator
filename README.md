@@ -15,3 +15,14 @@ The architecture for this project is losely based off of an MVC architecture. A 
 
 **Questions**  
 - Is there a way to run python code on a website?
+
+## Running the Code
+To run the code you will need the following packages:
+
+- [pytorch](https://pytorch.org/get-started/locally/)
+- [spacey](https://spacy.io/usage)
+- [numpy](https://numpy.org/install/)
+
+Clicking any of the names above will bring you to the relavent instrucitions to install the package for your given platform.
+
+Running the python file adventures.py should begin a basic adventure in the terminal.
