@@ -130,3 +130,6 @@ dmypy.json
 
 # VSCode Configs
 .vscode/
+
+# Spacey datasets
+.data/
