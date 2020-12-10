@@ -133,3 +133,6 @@ dmypy.json
 
 # Spacey datasets
 .data/
+
+# Model Files for Pytorch
+model/
