@@ -17,8 +17,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils.rnn import pad_sequence
 from torch.autograd import Variable
-import math, copy, time
+import math
+import copy
+import time
+
 
 class Transformer(nn.Module):
     """
@@ -58,10 +62,39 @@ class Transformer(nn.Module):
         """
         return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
 
+    def generate_text(self, prompt, vocab):
+        """
+        Generate text given a text prompt and vocabulary.
+        """
+        numerical_prompt = [torch.tensor([vocab.stoi["<SOS>"]]
+                                         + vocab.numericalize(prompt)
+                                         + [vocab.stoi["<EOS>"]]),
+                            torch.tensor([0 for _ in range(512)])]
+        numerical_prompt = pad_sequence(numerical_prompt,
+                                        batch_first=False,
+                                        padding_value=0)
+        numerical_prompt = numerical_prompt.transpose(0, 1)
+        padding_difference = 512 - numerical_prompt.shape[0]
+        if padding_difference > 0:
+            numerical_prompt = F.pad(input=numerical_prompt,
+                                     pad=(0, 0, 0, padding_difference))
+        mask = (numerical_prompt[0] != vocab.stoi["<PAD>"]).unsqueeze(-2)
+        model_out = self.greedy_decode(self,
+                                       numerical_prompt[0], mask,
+                                       max_len=60,
+                                       start_symbol=vocab.stoi["<SOS>"])
+        text = ""
+        for i in range(1, model_out.size(1)):
+            sym = vocab.itos[model_out[0, i].item()]
+            if sym == "<EOS>":
+                break
+            text += f"{sym} "
+        return text
+
     @staticmethod
     def clones(module, N):
         """
-        Produce N identifical layers.
+        Helper: Produce N identifical layers.
 
         Args:
             module: Module to be duplicated.
@@ -72,7 +105,7 @@ class Transformer(nn.Module):
     @staticmethod
     def subsequent_mask(size):
         """
-        Mask out subsequent positions
+        Helper: Mask out subsequent positions
         """
         attn_shape = (1, size, size)
         subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
@@ -91,7 +124,7 @@ class Transformer(nn.Module):
         model = Transformer(
             Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
             Decoder(DecoderLayer(d_model, c(attn), c(attn),
-                                c(ff), dropout), N),
+                                 c(ff), dropout), N),
             nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
             nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
             Generator(d_model, tgt_vocab))
@@ -106,35 +139,39 @@ class Transformer(nn.Module):
     @staticmethod
     def attention(query, key, value, mask=None, dropout=None):
         """
-        Compute 'Scaled Dot Product Attention'
+        Helper: Compute 'Scaled Dot Product Attention'
         """
         d_k = query.size(-1)
         scores = torch.matmul(query, key.transpose(-2, -1)) \
-                / math.sqrt(d_k)
+            / math.sqrt(d_k)
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -1e9)
-        p_attn = F.softmax(scores, dim = -1)
+        p_attn = F.softmax(scores, dim=-1)
         if dropout is not None:
             p_attn = dropout(p_attn)
         return torch.matmul(p_attn, value), p_attn
 
     @staticmethod
     def greedy_decode(model, src, src_mask, max_len, start_symbol):
+        """
+        Helper: Calculate the best word given the model output.
+        """
         memory = model.encode(src, src_mask)
         ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
-        for i in range(max_len-1):
+        for i in range(max_len - 1):
             out = model.decode(memory, src_mask,
                                Variable(ys),
                                Variable(Transformer.subsequent_mask(ys.size(1))
                                         .type_as(src.data)))
             prob = model.generator(out[:, -1])
-            _, next_word = torch.max(prob, dim = 1)
+            _, next_word = torch.max(prob, dim=1)
             next_word = next_word.data[0]
             ys = torch.cat([ys,
                             torch.ones(1, 1)
-                                .type_as(src.data)
-                                .fill_(next_word)], dim=1)
+                            .type_as(src.data)
+                            .fill_(next_word)], dim=1)
         return ys
+
 
 class Generator(nn.Module):
     """
@@ -157,11 +194,12 @@ class Generator(nn.Module):
         """
         return F.log_softmax(self.proj(x), dim=-1)
 
+
 class Encoder(nn.Module):
     """
     Core encoder is a stack of N layers.
     """
-    
+
     def __init__(self, layer, N):
         """
         Instantiate encoder module.
@@ -178,11 +216,12 @@ class Encoder(nn.Module):
             x = layer(x, mask)
         return self.norm(x)
 
+
 class LayerNorm(nn.Module):
     """
     Construct a normalization layer.
     """
-    
+
     def __init__(self, features, eps=1e-6):
         """
         Instantiate layer norm.
@@ -199,6 +238,7 @@ class LayerNorm(nn.Module):
         mean = x.mean(-1, keepdim=True)
         std = x.std(-1, keepdim=True)
         return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
+
 
 class SublayerConnection(nn.Module):
     """
@@ -220,6 +260,7 @@ class SublayerConnection(nn.Module):
         """
         return x + self.dropout(sublayer(self.norm(x)))
 
+
 class EncoderLayer(nn.Module):
     """
     Assemble an encoder layer for use inside an encoder.
@@ -236,6 +277,7 @@ class EncoderLayer(nn.Module):
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         return self.sublayer[1](x, self.feed_forward)
 
+
 class Decoder(nn.Module):
     """
     Generic N layer decoder with masking.
@@ -251,11 +293,12 @@ class Decoder(nn.Module):
             x = layer(x, memory, src_mask, tgt_mask)
         return self.norm(x)
 
+
 class DecoderLayer(nn.Module):
     """
     Decoder is made of self-attn, src-attn, and feedforward
     """
-    
+
     def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
         super(DecoderLayer, self).__init__()
         self.size = size
@@ -269,6 +312,7 @@ class DecoderLayer(nn.Module):
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
         x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
         return self.sublayer[2](x, self.feed_forward)
+
 
 class MultiHeadedAttention(nn.Module):
     """
@@ -300,17 +344,18 @@ class MultiHeadedAttention(nn.Module):
 
         # 1) Do all the linear projections in batch from d_model => h x d_k
         query, key, value = \
-            [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
-                for l, x in zip(self.linears, (query, key, value))]
+            [linear(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
+                for linear, x in zip(self.linears, (query, key, value))]
 
         # 2) Apply attention on all the projected vectors in batch
         x, self.attn = Transformer.attention(query, key, value, mask=mask,
-                                    dropout=self.dropout)
+                                             dropout=self.dropout)
 
         # 3) "Concat" using a view and apply a final linear
         x = x.transpose(1, 2).contiguous() \
             .view(nbatches, -1, self.h * self.d_k)
         return self.linears[-1](x)
+
 
 class PositionwiseFeedForward(nn.Module):
     """
@@ -325,7 +370,8 @@ class PositionwiseFeedForward(nn.Module):
 
     def forward(self, x):
         return self.w_2(self.dropout(F.relu(self.w_1(x))))
-        
+
+
 class Embeddings(nn.Module):
     """
     Embed text as vectors
@@ -339,11 +385,12 @@ class Embeddings(nn.Module):
     def forward(self, x):
         return self.lut(x) * math.sqrt(self.d_model)
 
+
 class PositionalEncoding(nn.Module):
     """
     Implement the PE function.
     """
-    
+
     def __init__(self, d_model, dropout, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -362,6 +409,7 @@ class PositionalEncoding(nn.Module):
         x = x + Variable(self.pe[:, :x.size(1)],
                          requires_grad=False)
         return self.dropout(x)
+
 
 if __name__ == "__main__":
     tmp_model = Transformer.make_model(10, 10, 2)
