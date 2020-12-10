@@ -2,6 +2,7 @@ from model import Model
 from view import View
 from controller import Controller
 
+
 class Adventure:
     """
     An implementation of an AI generated choose your own adventure story.
@@ -18,21 +19,36 @@ class Adventure:
         """
         Instanitate necessary variables for the game.
         """
-        self._model = Model()
+        self._model = Model("TEST", "data_TRAIN.csv")
         self._view = View()
         self._controller = Controller()
 
-    def run(self):
+    def run(self, prompt):
         """
         Runs the main loop of the game.
+
+        Args:
+            prompt: String used as a prompt for the AI to start the game.
         """
-        # Generate text         generated_text = _model.generate_text()
-        # Update game state     _model.update()
-        # Display text          _view.display(generated_text)
-        # Get user input        user_input = _controller.prompt()
-        # REPEAT!
-        pass
+        game_over = False
+        while not game_over:
+            # Generate text
+            output = self._model.generate_text(prompt)
+
+            # Display text
+            self._view.display(output)
+
+            # Get user input
+            prompt = self._controller.prompt()
+
+            # Display prompt
+            self._view.display(prompt, new_line=True)
+
+            # Check if game is over
+            if prompt == "EXIT":        # User exit
+                game_over = True
+
 
 if __name__ == "__main__":
     game = Adventure()
-    game.run()
+    game.run("Hello my name is ")
