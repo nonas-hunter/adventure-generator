@@ -1,1 +1,2 @@
-# Landing Page
+# Welcome to the Adventure!
+Adventure Generator is a choose your own adventure text based game where the narrator of the story is an articial intellegence. This project is heavily inspired by [AI Dungeons](https://play.aidungeon.io), another AI based choose your own adventure game created by Latitude. The goal of this project is to build off of the gameplay in AI Dungeons and add other features such as inventory, health, and narrative consistency.
