@@ -32,6 +32,9 @@ class Adventure:
         """
         game_over = False
         while not game_over:
+            # Display prompt
+            self._view.display(prompt, new_line=True)
+
             # Generate text
             output = self._model.generate_text(prompt)
 
@@ -40,9 +43,6 @@ class Adventure:
 
             # Get user input
             prompt = self._controller.prompt()
-
-            # Display prompt
-            self._view.display(prompt, new_line=True)
 
             # Check if game is over
             if prompt == "EXIT":        # User exit

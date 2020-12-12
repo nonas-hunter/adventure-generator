@@ -21,7 +21,7 @@ class Model:
             model_path: String containing path to file containing pretrained
                 model parameters.
         """
-        self._vocab = AdventureDataset("./", f"data/{data_file}").vocab
+        self._vocab = AdventureDataset(f"data/{data_file}").vocab
         self._text = []
         self._ai = Transformer.make_model(len(self._vocab),
                                           len(self._vocab), N=6)

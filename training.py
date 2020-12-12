@@ -31,7 +31,7 @@ class Training:
     """
 
     def __init__(self):
-        dataset = AdventureDataset("./", "data/data_TRAIN.csv")
+        dataset = AdventureDataset("data/data_TRAIN.csv")
         pad_idx = dataset.vocab.stoi["<PAD>"]
         print(f"pad_idx: {pad_idx}")
         loader = DataLoader(dataset=dataset,
@@ -337,7 +337,7 @@ class AdventureDataset(Dataset):
     into numerical representations.
     """
 
-    def __init__(self, root_dir, data_file, transform=None, freq_threshold=1):
+    def __init__(self, data_file, root_dir="./", transform=None, freq_threshold=1):
         self.root_dir = root_dir
         self.df = pd.read_csv(data_file)
         self.transform = transform
