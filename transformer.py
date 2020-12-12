@@ -62,19 +62,19 @@ class Transformer(nn.Module):
         """
         return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
 
-    def generate_text(self, prompt, vocab):
+    def generate_text(self, tokenized_prompt, vocab):
         """
         Generate text given a text prompt and vocabulary.
         """
         numerical_prompt = [torch.tensor([vocab.stoi["<SOS>"]]
-                                         + vocab.numericalize(prompt)
+                                         + vocab.numericalize(tokenized_prompt, tokenize=False)
                                          + [vocab.stoi["<EOS>"]]),
-                            torch.tensor([0 for _ in range(512)])]
+                            torch.tensor([0 for _ in range(1024)])]
         numerical_prompt = pad_sequence(numerical_prompt,
                                         batch_first=False,
                                         padding_value=0)
         numerical_prompt = numerical_prompt.transpose(0, 1)
-        padding_difference = 512 - numerical_prompt.shape[0]
+        padding_difference = 10 - numerical_prompt.shape[0]
         if padding_difference > 0:
             numerical_prompt = F.pad(input=numerical_prompt,
                                      pad=(0, 0, 0, padding_difference))
@@ -112,8 +112,8 @@ class Transformer(nn.Module):
         return torch.from_numpy(subsequent_mask) == 0
 
     @staticmethod
-    def make_model(src_vocab, tgt_vocab, N=6,
-                   d_model=512, d_ff=2048, h=8, dropout=0.1):
+    def make_model(src_vocab, tgt_vocab, N=10,
+                   d_model=1024, d_ff=4096, h=8, dropout=0.1):
         """
         Helper: Construct a model from hyperparameters.
         """

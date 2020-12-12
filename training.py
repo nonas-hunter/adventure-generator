@@ -47,7 +47,7 @@ class Training:
             batch_iter.append(Batch.rebatch(0, src, tgt))
 
         model = Transformer.make_model(len(dataset.vocab),
-                                       len(dataset.vocab), N=10)
+                                       len(dataset.vocab), N=6)
         criterion = LabelSmoothing(size=len(dataset.vocab),
                                    padding_idx=pad_idx,
                                    smoothing=0.1)
@@ -56,7 +56,7 @@ class Training:
                                              lr=0,
                                              betas=(0.9, 0.98),
                                              eps=1e-9))
-        for epoch in range(10):
+        for epoch in range(50):
             model.train()
             Training.run_epoch(batch_iter, model,
                                SimpleLossCompute(model.generator,
@@ -310,8 +310,9 @@ class Vocabulary:
                     self.itos[idx] = word
                     idx += 1
 
-    def numericalize(self, text):
-        tokenized_text = self.tokenize(text)
+    def numericalize(self, text, tokenize=True):
+        if tokenize:
+            tokenized_text = self.tokenize(text)
 
         return [self.stoi[token] if token in self.stoi else self.stoi["<UNK>"]
                 for token in tokenized_text]
