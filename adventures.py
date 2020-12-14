@@ -19,7 +19,7 @@ class Adventure:
         """
         Instanitate necessary variables for the game.
         """
-        self._model = Model("TEST", "data_TRAIN.csv")
+        self._model = Model("TEST", "test.csv")
         self._view = View()
         self._controller = Controller()
 
@@ -45,10 +45,11 @@ class Adventure:
             prompt = self._controller.prompt()
 
             # Check if game is over
+            # TODO: Implement game over detection
             if prompt == "EXIT":        # User exit
                 game_over = True
 
 
 if __name__ == "__main__":
     game = Adventure()
-    game.run("Hello my name is ")
+    game.run("Once upon a time...")
