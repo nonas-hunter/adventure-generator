@@ -26,8 +26,9 @@ import time
 
 class Transformer(nn.Module):
     """
-    A standard Encoder-Decoder architecture. Base for this and many
-    other models.
+    A standard Encoder-Decoder transformer architecture.
+
+
     """
 
     def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
@@ -66,23 +67,23 @@ class Transformer(nn.Module):
         """
         Generate text given a text prompt and vocabulary.
         """
+        assert len(tokenized_prompt) <= 510
         numerical_prompt = [torch.tensor([vocab.stoi["<SOS>"]]
-                                         + vocab.numericalize(tokenized_prompt, tokenize=False)
+                                         + vocab.numericalize(tokenized_prompt,
+                                                              tokenize=False)
                                          + [vocab.stoi["<EOS>"]]),
-                            torch.tensor([0 for _ in range(1024)])]
+                            torch.tensor([0 for _
+                                          in range(512)])]
         numerical_prompt = pad_sequence(numerical_prompt,
                                         batch_first=False,
                                         padding_value=0)
         numerical_prompt = numerical_prompt.transpose(0, 1)
-        padding_difference = 10 - numerical_prompt.shape[0]
-        if padding_difference > 0:
-            numerical_prompt = F.pad(input=numerical_prompt,
-                                     pad=(0, 0, 0, padding_difference))
         mask = (numerical_prompt[0] != vocab.stoi["<PAD>"]).unsqueeze(-2)
         model_out = self.greedy_decode(self,
                                        numerical_prompt[0], mask,
-                                       max_len=60,
-                                       start_symbol=vocab.stoi["<SOS>"])
+                                       max_len=256,
+                                       start_symbol=vocab.stoi["<SOS>"],
+                                       end_symbol=vocab.stoi["<EOS>"])
         text = ""
         for i in range(1, model_out.size(1)):
             sym = vocab.itos[model_out[0, i].item()]
@@ -112,8 +113,8 @@ class Transformer(nn.Module):
         return torch.from_numpy(subsequent_mask) == 0
 
     @staticmethod
-    def make_model(src_vocab, tgt_vocab, N=10,
-                   d_model=1024, d_ff=4096, h=8, dropout=0.1):
+    def make_model(src_vocab, tgt_vocab, N=6,
+                   d_model=512, d_ff=2048, h=8, dropout=0.1):
         """
         Helper: Construct a model from hyperparameters.
         """
@@ -152,7 +153,8 @@ class Transformer(nn.Module):
         return torch.matmul(p_attn, value), p_attn
 
     @staticmethod
-    def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    def greedy_decode(model, src, src_mask, max_len,
+                      start_symbol, end_symbol=None):
         """
         Helper: Calculate the best word given the model output.
         """
@@ -170,6 +172,8 @@ class Transformer(nn.Module):
                             torch.ones(1, 1)
                             .type_as(src.data)
                             .fill_(next_word)], dim=1)
+            if end_symbol is not None and next_word == end_symbol:
+                break
         return ys
 
 
@@ -329,7 +333,6 @@ class MultiHeadedAttention(nn.Module):
         self.d_k = d_model // h
         self.h = h
         self.linears = Transformer.clones(nn.Linear(d_model, d_model), 4)
-        self.attn = None
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
 

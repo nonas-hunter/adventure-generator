@@ -28,12 +28,24 @@ from transformer import *
 class Training:
     """
     Contains all functions for model training.
+
+    Instantiating this class will train a model on the given dataset and save
+    the parameters in the given file name.
     """
 
-    def __init__(self):
-        dataset = AdventureDataset("data/data_TRAIN.csv")
+    def __init__(self, dataset, model_file):
+        """
+        Train a model on the given dataset and save the resulting parameters.
+
+        Args:
+            dataset: Filename of dataset (including .csv).
+            model_file: Name of file where parameters will be saved. 
+        Assumptions:
+            dataset files are located in the data folder.
+            model files are located in the model folder.
+        """
+        dataset = AdventureDataset(f"data/{dataset}")
         pad_idx = dataset.vocab.stoi["<PAD>"]
-        print(f"pad_idx: {pad_idx}")
         loader = DataLoader(dataset=dataset,
                             batch_size=32,
                             num_workers=8,
@@ -47,11 +59,11 @@ class Training:
             batch_iter.append(Batch.rebatch(0, src, tgt))
 
         model = Transformer.make_model(len(dataset.vocab),
-                                       len(dataset.vocab), N=6)
+                                       len(dataset.vocab))
         criterion = LabelSmoothing(size=len(dataset.vocab),
                                    padding_idx=pad_idx,
                                    smoothing=0.1)
-        model_opt = NoamOpt(model.src_embed[0].d_model, 1, 400,
+        model_opt = NoamOpt(model.src_embed[0].d_model, 1, 2000,
                             torch.optim.Adam(model.parameters(),
                                              lr=0,
                                              betas=(0.9, 0.98),
@@ -79,7 +91,7 @@ class Training:
             print(f"Source Mask: {src_mask}")
             print(f"Source: {src}")
             print(f"Target: {batch.trg.data[0,:]}")
-            print("Translation:", end="\t")
+            print("Output:", end="\t")
             for i in range(1, out.size(1)):
                 sym = dataset.vocab.itos[out[0, i].item()]
                 if sym == "<EOS>":
@@ -94,14 +106,21 @@ class Training:
                 print(sym, end=" ")
             print()
             break
-
-        torch.save(model.state_dict(), "./model/TEST")
-        print("MADE IT TO THE VERY END")
+        torch.save(model.state_dict(), f"./model/{model_file}")
+        print("#### Training Complete ####")
+        print("####    Model Saved    ####")
 
     @staticmethod
     def run_epoch(data_iter, model, loss_compute):
         """
         Standard training and logging function.
+
+        Args:
+            data_iter: List of Batch instances containing data to be
+                run through the algorithm.
+            model: Instance of the Transformer class.
+                Represents transformer model.
+            loss_compute: Function to compute loss or "incorrectness".
         """
         start = time.time()
         total_tokens = 0
@@ -126,6 +145,16 @@ class Training:
 
     @staticmethod
     def get_std_opt(model):
+        """
+        Create a standard optimization function.
+
+        Args:
+            model: Instance of Transformer class which will use the
+                optimization function.
+        Returns:
+            A standard optimization function based on values determined by
+            the team working on OpenNMT.
+        """
         return NoamOpt(model.src_embed[0].d_model, 2, 4000,
                        torch.optim.Adam(model.parameters(),
                                         lr=0,
@@ -133,11 +162,16 @@ class Training:
                                         eps=1e-9))
 
     @staticmethod
-    def data_gen(V, batch, nbatches):
+    def data_gen(V, batch, number_batches):
         """
         Generate random data for a src-tgt copy task.
+
+        Args:
+            V: Integer size of data to be generated.
+            batch: Integer size of batches.
+            number_batches: Integer number of batches.
         """
-        for i in range(nbatches):
+        for i in range(number_batches):
             data = torch.from_numpy(np.random.randint(1, V, size=(batch, 10)))
             data[:, 0] = 1
             src = Variable(data, requires_grad=False)
@@ -148,12 +182,25 @@ class Training:
 class Batch:
     """
     Object for holding a batch of data with mask during training.
+
+    Attributes:
+        src: List of source data.
+        src_mask: List representing how much of the source data to mask at any
+            given time.
+        trg: List of target data.
+        trg_mask: List representing how much of the target data to mask at any
+            given time.
     """
 
-    max_src_in_batch = None
-    max_tgt_in_batch = None
-
     def __init__(self, src, trg=None, pad=0):
+        """
+        Instantiate a Batch of data containing the source data and target data.
+
+        Args:
+            src: List of source data.
+            trg: List of target data.
+            pad: Integer amount to pad the data with.
+        """
         self.src = src
         self.src_mask = (src != pad).unsqueeze(-2)
         if trg is not None:
@@ -172,20 +219,6 @@ class Batch:
         tgt_mask = tgt_mask & Variable(
             Transformer.subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
         return tgt_mask
-
-    @staticmethod
-    def batch_size_fn(new, count, sofar):
-        """
-        Keep augmenting batch and calculate total number of tokens + padding.
-        """
-        if count == 1:
-            Batch.max_src_in_batch = 0
-            Batch.max_tgt_in_batch = 0
-        Batch.max_src_in_batch = max(Batch.max_src_in_batch, len(new.src))
-        Batch.max_tgt_in_batch = max(Batch.max_tgt_in_batch, len(new.trg) + 2)
-        src_elements = count * Batch.max_src_in_batch
-        tgt_elements = count * Batch.max_tgt_in_batch
-        return max(src_elements, tgt_elements)
 
     @staticmethod
     def rebatch(pad_idx, src_in, trg_in):
@@ -312,10 +345,10 @@ class Vocabulary:
 
     def numericalize(self, text, tokenize=True):
         if tokenize:
-            tokenized_text = self.tokenize(text)
+            text = self.tokenize(text)
 
         return [self.stoi[token] if token in self.stoi else self.stoi["<UNK>"]
-                for token in tokenized_text]
+                for token in text]
 
     @staticmethod
     def tokenize(text):
@@ -337,7 +370,8 @@ class AdventureDataset(Dataset):
     into numerical representations.
     """
 
-    def __init__(self, data_file, root_dir="./", transform=None, freq_threshold=1):
+    def __init__(self, data_file, root_dir="./",
+                 transform=None, freq_threshold=1):
         self.root_dir = root_dir
         self.df = pd.read_csv(data_file)
         self.transform = transform
@@ -398,33 +432,4 @@ class AdventureCollate:
 
 
 if __name__ == "__main__":
-    # Train the simple copy task.
-    V = 11
-    criterion = LabelSmoothing(size=V, padding_idx=0, smoothing=0.0)
-    model = Transformer.make_model(V, V, N=2)
-    model_opt = NoamOpt(model.src_embed[0].d_model, 1, 400,
-                        torch.optim.Adam(model.parameters(),
-                                         lr=0,
-                                         betas=(0.9, 0.98),
-                                         eps=1e-9))
-    for epoch in range(10):
-        model.train()
-        Training.run_epoch(Training.data_gen(V, 30, 20), model,
-                           SimpleLossCompute(model.generator,
-                                             criterion,
-                                             model_opt))
-        model.eval()
-        print(Training.run_epoch(Training.data_gen(V, 30, 5), model,
-                                 SimpleLossCompute(model.generator,
-                                                   criterion,
-                                                   None)))
-
-    # Run and decode model copy
-    model.eval()
-    src = Variable(torch.LongTensor([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]))
-    src_mask = Variable(torch.ones(1, 1, 10))
-    print(Transformer.greedy_decode(model,
-                                    src,
-                                    src_mask,
-                                    max_len=10,
-                                    start_symbol=1))
+    training = Training("test.csv", "italian_numbers")
