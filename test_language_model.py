@@ -2,25 +2,6 @@ import pytest
 from training import *
 from transformer import *
 
-# Test cases to use as the basis for creating queues.
-list_init_cases = [
-    [],
-    [1],
-    [1, 2, 3],
-    [1.0, 2.0, 3.0],
-    ["a", "b", "c"],
-    [True, False, True],
-    [1, True, "c"],
-]
-
-
-# Test cases to use for appending new items to a queue.
-new_item_cases = [
-    42,
-    "Hello",
-    3.14,
-    True,
-]
 
 def test_vocab_load():
     """
