@@ -40,7 +40,7 @@ class Model:
         tokenized_prompt = self._vocab.tokenize(prompt)
         self._text += tokenized_prompt
         if len(self._text) > 510:
-            self._text = self._text[:len(self._text)-510]
+            self._text = self._text[:len(self._text) - 510]
         output = self._ai.generate_text(self._text, self._vocab)
         tokenized_output = self._vocab.tokenize(output)
         self._text += tokenized_output
